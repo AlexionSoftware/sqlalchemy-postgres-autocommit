@@ -30,11 +30,11 @@ class AutocommitDatabase:
         if self._should_disable_autocommit(transaction, connection):
             self.disable_autocommit(transaction, connection)
 
-    def _should_disable_autocommit(self, transaction, connection: engine.Connection):
+    def _should_disable_autocommit(self, transaction, connection):
         dbapi_connection = self._get_dbapi_connection(connection)
         return dbapi_connection.autocommit and not transaction.nested
 
-    def disable_autocommit(self, transaction, connection: engine.Connection):
+    def disable_autocommit(self, transaction, connection):
         dbapi_connection = self._get_dbapi_connection(connection)
         dbapi_connection.autocommit = False
         self._transaction_connections.setdefault(transaction, set()).add(dbapi_connection)
@@ -53,27 +53,29 @@ class AutocommitDatabase:
             dbapi_connection.autocommit = True
         del self._transaction_connections[transaction]
 
-    def _get_dbapi_connection(self, connection: engine.Connection) -> extensions.connection:
+    def _get_dbapi_connection(self, connection):
         return connection.connection.connection
 
 
 class Session(sqla_session.Session):
-    def __init__(self, *args, fake_root_transaction=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fake_root_transaction = fake_root_transaction
+    def __init__(self, *args, **kwargs):
+        sqla_session.Session.__init__(self, *args, **kwargs)
+        self.fake_root_transaction = kwargs["fake_root_transaction"] if "fake_root_transaction" in kwargs else False
 
     def commit(self):
         if self._in_transaction or not self.autocommit:
-            super().commit()
+            sqla_session.Session.commit(self)
         else:
             self.flush()
 
-    def begin(self, *args, nested=False, **kwargs):
+    def begin(self, *args, **kwargs):
+        nested = kwargs["nested"] if "nested" in kwargs else False
+
         if self._should_fake_transaction():
             self._create_faked_root_transaction()
-            return super().begin(*args, nested=True, **kwargs)
+            return sqla_session.Session.begin(self, *args, nested=True, **kwargs)
         else:
-            return super().begin(*args, nested=nested, **kwargs)
+            return sqla_session.Session.begin(self, *args, nested=nested, **kwargs)
 
     def _should_fake_transaction(self):
         return self.fake_root_transaction and not self._in_transaction
