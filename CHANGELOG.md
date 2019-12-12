@@ -1,6 +1,13 @@
 Changelog for sqlalchemy-postgres-autocommit
 =================
 
+0.4.1 (2019-01-28)
+------------------
+
+- Do not re-enable autocommit for closed connections.
+- Add pip 10 support.
+
+
 0.4.0 (2017-11-09)
 ------------------
 
